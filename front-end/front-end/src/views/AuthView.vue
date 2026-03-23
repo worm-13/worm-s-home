@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-
-gsap.registerPlugin(ScrollTrigger);
 
 type AuthMode = 'login' | 'register';
 type LoginMethod = 'nickname' | 'id';
@@ -46,41 +43,48 @@ onMounted(() => {
   }
 
   heroAnimationContext = gsap.context(() => {
-    const targets = heroPanel.value?.querySelectorAll('.hero-animate:not(.brand)');
-    const brandTarget = heroPanel.value?.querySelector('.brand');
+    const panel = heroPanel.value;
 
-    if (!targets || targets.length === 0) {
+    if (!panel) {
       return;
     }
 
-    gsap.from(targets, {
-      y: 70,
-      opacity: 0,
-      duration: 0.9,
-      ease: 'power2.out',
-      stagger: 0.14,
-      scrollTrigger: {
-        trigger: heroPanel.value,
-        start: 'top 80%',
-        toggleActions: 'play none none none'
-      }
-    });
+    const targets = gsap
+      .utils.toArray<HTMLElement>('.hero-animate', panel)
+      .filter((item) => !item.classList.contains('brand'));
+    const brandTarget = panel.querySelector<HTMLElement>('.brand');
+
+    if (targets.length > 0) {
+      gsap.set(targets, { willChange: 'transform, opacity', force3D: true });
+
+      gsap.from(targets, {
+        y: 52,
+        opacity: 0,
+        duration: 0.78,
+        ease: 'power2.out',
+        stagger: 0.1,
+        clearProps: 'willChange'
+      });
+    }
 
     if (brandTarget) {
-      // Avoid transform conflicts with existing CSS keyframes on .brand.
-      gsap.set(brandTarget, { animation: 'none' });
+      gsap.set(brandTarget, { willChange: 'transform, opacity', force3D: true, animation: 'none' });
 
+      gsap.from(brandTarget, {
+        y: 58,
+        opacity: 0,
+        duration: 0.9,
+        ease: 'sine.out'
+      });
+
+      // Subtle floating loop to keep motion alive without heavy main-thread cost.
       gsap.to(brandTarget, {
-        keyframes: {
-          y: [0, 80, -10, 30, 0],
-          ease: 'none',
-          easeEach: 'power2.inOut'
-        },
-        rotate: 360,
-        ease: 'elastic',
-        duration: 5,
-        transformOrigin: '50% 50%',
-        delay: 0.25
+        y: -6,
+        duration: 2.8,
+        ease: 'sine.inOut',
+        repeat: -1,
+        yoyo: true,
+        delay: 0.95
       });
     }
   }, heroPanel.value);

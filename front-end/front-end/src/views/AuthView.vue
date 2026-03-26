@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { gsap } from 'gsap';
+
+const router = useRouter();
 
 type AuthMode = 'login' | 'register';
 type LoginMethod = 'nickname' | 'id';
@@ -26,9 +29,6 @@ const registerForm = reactive<RegisterForm>({
   nickname: '',
   password: ''
 });
-
-// Front-end mock data for nickname uniqueness check before backend integration.
-const takenNicknames = new Set(['阿岭', '熊大', '熊二', '光头强'].map((item) => item.toLowerCase()));
 
 const message = ref('');
 const isError = ref(false);
@@ -109,7 +109,7 @@ function setLoginMethod(nextMethod: LoginMethod) {
   isError.value = false;
 }
 
-function submitLogin() {
+async function submitLogin() {
   const identifier = loginForm.identifier.trim();
 
   if (identifier.length < 2) {
@@ -118,9 +118,9 @@ function submitLogin() {
     return;
   }
 
-  if (loginMethod.value === 'id' && !/^[A-Za-z0-9_-]{6,32}$/.test(identifier)) {
+  if (loginMethod.value === 'id' && !/^[A-Za-z0-9_-]{5,32}$/.test(identifier)) {
     isError.value = true;
-    message.value = 'ID 仅支持字母、数字、下划线和连字符，长度 6-32。';
+    message.value = 'ID 仅支持字母、数字、下划线和连字符，长度 5-32。';
     return;
   }
 
@@ -130,22 +130,41 @@ function submitLogin() {
     return;
   }
 
-  isError.value = false;
-  message.value = '登录校验通过，后续可接入接口。';
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: identifier,
+        password: loginForm.password
+      })
+    });
+    const result = await res.json();
+    if (result.code === 0) {
+      isError.value = false;
+      message.value = '登录成功！欢迎回来。';
+      // Save user info and redirect to home
+      localStorage.setItem('userInfo', JSON.stringify({
+        id: result.data.id,
+        username: result.data.username
+      }));
+      router.push('/home');
+    } else {
+      isError.value = true;
+      message.value = result.message || '登录失败，请重试。';
+    }
+  } catch (err) {
+    isError.value = true;
+    message.value = '网络错误，请稍后再试。';
+  }
 }
 
-function submitRegister() {
+async function submitRegister() {
   const nickname = registerForm.nickname.trim();
 
   if (nickname.length < 2) {
     isError.value = true;
     message.value = '昵称至少 2 个字符。';
-    return;
-  }
-
-  if (takenNicknames.has(nickname.toLowerCase())) {
-    isError.value = true;
-    message.value = '该昵称已被占用，请更换昵称。';
     return;
   }
 
@@ -155,8 +174,37 @@ function submitRegister() {
     return;
   }
 
-  isError.value = false;
-  message.value = '注册校验通过，后端会生成唯一 ID。';
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: nickname,
+        password: registerForm.password
+      })
+    });
+    const result = await res.json();
+    if (result.code === 0) {
+      isError.value = false;
+      message.value = `注册成功！您的 ID 为 ${result.data?.id}，即将自动登录...`;
+      
+      // Save info and redirect to home directly
+      localStorage.setItem('userInfo', JSON.stringify({
+        id: result.data.id,
+        username: result.data.username
+      }));
+
+      setTimeout(() => {
+        router.push('/home');
+      }, 2000);
+    } else {
+      isError.value = true;
+      message.value = result.message || '注册失败，请更换昵称重试。';
+    }
+  } catch (err) {
+    isError.value = true;
+    message.value = '网络错误，请稍后再试。';
+  }
 }
 </script>
 
@@ -236,7 +284,7 @@ function submitRegister() {
           密码
           <input v-model="registerForm.password" type="password" placeholder="至少 6 位" />
         </label>
-        <p class="hint">注册时只需要昵称和密码，后端会自动生成唯一 ID。</p>
+        
         <button class="submit" type="submit">{{ actionText }}</button>
       </form>
 

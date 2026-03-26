@@ -1,7 +1,8 @@
 package com.worm.community_backend.user.controller;
 
 import com.worm.community_backend.common.ApiResponse;
-import com.worm.community_backend.user.dto.CreateUserRequest;
+import com.worm.community_backend.user.dto.LoginRequest;
+import com.worm.community_backend.user.dto.RegisterRequest;
 import com.worm.community_backend.user.service.UserService;
 import com.worm.community_backend.user.vo.UserResponse;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/api/auth")
 public class UserController {
 
     private final UserService userService;
@@ -21,12 +22,17 @@ public class UserController {
         this.userService = userService;
     }
 
-    @PostMapping
-    public ApiResponse<UserResponse> createUser(@RequestBody CreateUserRequest request) {
-        return ApiResponse.success(userService.createUser(request));
+    @PostMapping("/register")
+    public ApiResponse<UserResponse> register(@RequestBody RegisterRequest request) {
+        return ApiResponse.success(userService.register(request));
     }
 
-    @GetMapping("/{id}")
+    @PostMapping("/login")
+    public ApiResponse<UserResponse> login(@RequestBody LoginRequest request) {
+        return ApiResponse.success(userService.login(request));
+    }
+
+    @GetMapping("/users/{id}")
     public ApiResponse<UserResponse> getUserById(@PathVariable Long id) {
         return ApiResponse.success(userService.getUserById(id));
     }

@@ -99,10 +99,22 @@ body {
 
 .brand {
   margin: 0;
-  font-family: 'ZCOOL KuaiLe', sans-serif;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0.48rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid rgba(226, 195, 118, 0.58);
+  background: linear-gradient(135deg, #fff7c9 0%, #ffefad 100%);
+  box-shadow:
+    0 10px 22px rgba(232, 196, 102, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  font-family: sans-serif;
   color: var(--accent);
   font-size: 2.8rem;
-  letter-spacing: 0.08em;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
   text-shadow:
     0 0 8px rgba(222, 93, 53, 0.45),
     0 0 22px rgba(222, 93, 53, 0.28);

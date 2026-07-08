@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.worm.community_backend.post.mapper.PostMapper">
+
+    <!-- 新增文章并回填自增主键 id -->
+    <insert id="insertPost" parameterType="com.worm.community_backend.post.entity.Post" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO posts (
+            user_id,
+            title,
+            content,
+            summary,
+            cover_image,
+            status,
+            scheduled_at,
+            view_count,
+            like_count,
+            comment_count
+        ) VALUES (
+            #{userId},
+            #{title},
+            #{content},
+            #{summary},
+            #{coverImage},
+            #{status},
+            #{scheduledAt},
+            0,
+            0,
+            0
+        )
+    </insert>
+
+    <!-- 发文成功后同步更新 users.posts_count -->
+    <update id="increaseUserPostsCount">
+        UPDATE users
+        SET posts_count = posts_count + 1
+        WHERE id = #{userId}
+    </update>
+
+    <!-- 查询已发布文章列表（发布时间倒序） -->
+    <select id="selectPublishedPostsOrderByCreatedAtDesc" resultType="com.worm.community_backend.post.vo.PostListItemVO">
+        SELECT
+            p.id,
+            p.user_id AS userId,
+            COALESCE(NULLIF(u.nickname, ''), u.username) AS authorName,
+            u.avatar AS authorAvatar,
+            p.title,
+            p.summary,
+            p.cover_image AS coverImage,
+            p.created_at AS createdAt
+        FROM posts p
+        LEFT JOIN users u ON u.id = p.user_id
+        WHERE p.status = 1
+        ORDER BY p.created_at DESC, p.id DESC
+    </select>
+
+    <!-- 查询单篇已发布文章详情 -->
+    <select id="selectPublishedPostDetailById" resultType="com.worm.community_backend.post.vo.PostDetailVO">
+        SELECT
+            p.id,
+            p.user_id AS userId,
+            COALESCE(NULLIF(u.nickname, ''), u.username) AS authorName,
+            u.avatar AS authorAvatar,
+            p.title,
+            p.content,
+            p.summary,
+            p.cover_image AS coverImage,
+            p.created_at AS createdAt,
+            p.like_count AS likesCount,
+            p.favorite_count AS favoritesCount
+        FROM posts p
+        LEFT JOIN users u ON u.id = p.user_id
+        WHERE p.id = #{id}
+          AND p.status = 1
+        LIMIT 1
+    </select>
+
+    <!-- 更新已发布/草稿/定时文章 -->
+    <update id="updatePost">
+        UPDATE posts
+        SET title = #{title},
+            content = #{content},
+            summary = #{summary},
+            cover_image = #{coverImage},
+            updated_at = NOW()
+        WHERE id = #{id} AND status IN (1, 2, 3)
+    </update>
+
+    <!-- 更新文章状态和定时发布时间 -->
+    <update id="updatePostStatus">
+        UPDATE posts
+        SET status = #{status},
+            scheduled_at = #{scheduledAt},
+            updated_at = NOW()
+        WHERE id = #{id} AND status IN (1, 2, 3)
+    </update>
+
+    <!-- 查询当前用户所有未删除文章 -->
+    <select id="selectMyPosts" resultType="com.worm.community_backend.post.vo.PostListItemVO">
+        SELECT
+            p.id,
+            p.user_id AS userId,
+            COALESCE(NULLIF(u.nickname, ''), u.username) AS authorName,
+            u.avatar AS authorAvatar,
+            p.title,
+            p.summary,
+            p.cover_image AS coverImage,
+            p.status AS status,
+            p.scheduled_at AS scheduledAt,
+            p.created_at AS createdAt,
+            p.updated_at AS updatedAt
+        FROM posts p
+        LEFT JOIN users u ON u.id = p.user_id
+        WHERE p.user_id = #{userId} AND p.status IN (1, 2, 3)
+        ORDER BY p.updated_at DESC, p.id DESC
+    </select>
+
+    <!-- 查询当前用户草稿列表 -->
+    <select id="selectMyDrafts" resultType="com.worm.community_backend.post.vo.PostListItemVO">
+        SELECT
+            p.id,
+            p.user_id AS userId,
+            COALESCE(NULLIF(u.nickname, ''), u.username) AS authorName,
+            u.avatar AS authorAvatar,
+            p.title,
+            p.summary,
+            p.cover_image AS coverImage,
+            p.scheduled_at AS scheduledAt,
+            p.created_at AS createdAt,
+            p.updated_at AS updatedAt
+        FROM posts p
+        LEFT JOIN users u ON u.id = p.user_id
+        WHERE p.user_id = #{userId} AND p.status = 2
+        ORDER BY p.updated_at DESC, p.id DESC
+    </select>
+
+    <!-- 查询已到达发布时间的定时文章 -->
+    <select id="selectScheduledPostsToPublish" resultType="com.worm.community_backend.post.entity.Post">
+        SELECT id, user_id AS userId
+        FROM posts
+        WHERE status = 3
+          AND scheduled_at IS NOT NULL
+          AND scheduled_at &lt;= NOW()
+    </select>
+
+    <!-- 发布草稿或定时文章（status 2/3→1） -->
+    <update id="publishPost">
+        UPDATE posts
+        SET status = 1,
+            created_at = NOW(),
+            updated_at = NOW()
+        WHERE id = #{id} AND status IN (2, 3)
+    </update>
+
+    <!-- 查询单篇文章详情（草稿/定时也可查看，仅作者可用） -->
+    <select id="selectMyPostDetailById" resultType="com.worm.community_backend.post.vo.PostDetailVO">
+        SELECT
+            p.id,
+            p.user_id AS userId,
+            COALESCE(NULLIF(u.nickname, ''), u.username) AS authorName,
+            u.avatar AS authorAvatar,
+            p.title,
+            p.content,
+            p.summary,
+            p.cover_image AS coverImage,
+            p.status AS status,
+            p.scheduled_at AS scheduledAt,
+            p.created_at AS createdAt,
+            p.updated_at AS updatedAt,
+            p.like_count AS likesCount,
+            p.favorite_count AS favoritesCount
+        FROM posts p
+        LEFT JOIN users u ON u.id = p.user_id
+        WHERE p.id = #{id}
+          AND p.user_id = #{userId}
+          AND p.status IN (1, 2, 3)
+        LIMIT 1
+    </select>
+
+    <!-- 分页：已发布文章列表 -->
+    <select id="selectPublishedPostsPage" resultType="com.worm.community_backend.post.vo.PostListItemVO">
+        SELECT
+            p.id,
+            p.user_id AS userId,
+            COALESCE(NULLIF(u.nickname, ''), u.username) AS authorName,
+            u.avatar AS authorAvatar,
+            p.title,
+            p.summary,
+            p.cover_image AS coverImage,
+            p.created_at AS createdAt
+        FROM posts p
+        LEFT JOIN users u ON u.id = p.user_id
+        WHERE p.status = 1
+        ORDER BY p.created_at DESC, p.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="countPublishedPosts" resultType="long">
+        SELECT COUNT(*) FROM posts WHERE status = 1
+    </select>
+
+    <!-- 分页：当前用户所有文章 -->
+    <select id="selectMyPostsPage" resultType="com.worm.community_backend.post.vo.PostListItemVO">
+        SELECT
+            p.id,
+            p.user_id AS userId,
+            COALESCE(NULLIF(u.nickname, ''), u.username) AS authorName,
+            u.avatar AS authorAvatar,
+            p.title,
+            p.summary,
+            p.cover_image AS coverImage,
+            p.status AS status,
+            p.scheduled_at AS scheduledAt,
+            p.created_at AS createdAt,
+            p.updated_at AS updatedAt
+        FROM posts p
+        LEFT JOIN users u ON u.id = p.user_id
+        WHERE p.user_id = #{userId} AND p.status IN (1, 2, 3)
+        ORDER BY p.updated_at DESC, p.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="countMyPosts" resultType="long">
+        SELECT COUNT(*) FROM posts WHERE user_id = #{userId} AND status IN (1, 2, 3)
+    </select>
+
+    <!-- 分页：当前用户草稿列表 -->
+    <select id="selectMyDraftsPage" resultType="com.worm.community_backend.post.vo.PostListItemVO">
+        SELECT
+            p.id,
+            p.user_id AS userId,
+            COALESCE(NULLIF(u.nickname, ''), u.username) AS authorName,
+            u.avatar AS authorAvatar,
+            p.title,
+            p.summary,
+            p.cover_image AS coverImage,
+            p.scheduled_at AS scheduledAt,
+            p.created_at AS createdAt,
+            p.updated_at AS updatedAt
+        FROM posts p
+        LEFT JOIN users u ON u.id = p.user_id
+        WHERE p.user_id = #{userId} AND p.status = 2
+        ORDER BY p.updated_at DESC, p.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="countMyDrafts" resultType="long">
+        SELECT COUNT(*) FROM posts WHERE user_id = #{userId} AND status = 2
+    </select>
+
+    <!-- 分页：指定用户的已发布文章（公开查看） -->
+    <select id="selectUserPublishedPostsPage" resultType="com.worm.community_backend.post.vo.PostListItemVO">
+        SELECT
+            p.id,
+            p.user_id AS userId,
+            COALESCE(NULLIF(u.nickname, ''), u.username) AS authorName,
+            u.avatar AS authorAvatar,
+            p.title,
+            p.summary,
+            p.cover_image AS coverImage,
+            p.created_at AS createdAt
+        FROM posts p
+        LEFT JOIN users u ON u.id = p.user_id
+        WHERE p.user_id = #{userId} AND p.status = 1
+        ORDER BY p.created_at DESC, p.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="countUserPublishedPosts" resultType="long">
+        SELECT COUNT(*) FROM posts WHERE user_id = #{userId} AND status = 1
+    </select>
+</mapper>

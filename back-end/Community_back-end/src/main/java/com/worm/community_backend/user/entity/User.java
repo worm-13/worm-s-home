@@ -8,6 +8,9 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/**
+ * 用户实体，对应 users 表。
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -28,6 +31,7 @@ public class User {
     private Integer followingCount;
     private Integer postsCount;
     private Integer status;
+    private String role;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
 }

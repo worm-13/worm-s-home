@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.worm.community_backend.message.mapper.MessageMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO messages (sender_id, receiver_id, content, is_read)
+        VALUES (#{senderId}, #{receiverId}, #{content}, #{isRead})
+    </insert>
+
+    <select id="selectConversationList" resultType="com.worm.community_backend.message.vo.ConversationVO">
+        SELECT
+            sub.other_user_id AS userId,
+            u.username,
+            u.nickname,
+            u.avatar,
+            sub.last_message AS lastMessage,
+            sub.last_message_time AS lastMessageTime,
+            sub.unread_count AS unreadCount
+        FROM (
+            SELECT
+                CASE WHEN sender_id = #{userId} THEN receiver_id ELSE sender_id END AS other_user_id,
+                content AS last_message,
+                created_at AS last_message_time,
+                SUM(CASE WHEN receiver_id = #{userId} AND is_read = 0 THEN 1 ELSE 0 END) OVER (
+                    PARTITION BY CASE WHEN sender_id = #{userId} THEN receiver_id ELSE sender_id END
+                ) AS unread_count,
+                ROW_NUMBER() OVER (
+                    PARTITION BY CASE WHEN sender_id = #{userId} THEN receiver_id ELSE sender_id END
+                    ORDER BY created_at DESC
+                ) AS rn
+            FROM messages
+            WHERE sender_id = #{userId} OR receiver_id = #{userId}
+        ) sub
+        JOIN users u ON u.id = sub.other_user_id
+        WHERE sub.rn = 1
+        ORDER BY sub.last_message_time DESC
+    </select>
+
+    <select id="selectConversation" resultType="com.worm.community_backend.message.vo.MessageVO">
+        SELECT
+            m.id,
+            m.sender_id AS senderId,
+            m.receiver_id AS receiverId,
+            m.content,
+            CASE m.is_read WHEN 1 THEN true ELSE false END AS isRead,
+            m.created_at AS createdAt,
+            u.username AS senderName,
+            u.avatar AS senderAvatar
+        FROM messages m
+        JOIN users u ON u.id = m.sender_id
+        WHERE (m.sender_id = #{userId} AND m.receiver_id = #{otherUserId})
+           OR (m.sender_id = #{otherUserId} AND m.receiver_id = #{userId})
+        ORDER BY m.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countUnread" resultType="int">
+        SELECT COUNT(*) FROM messages
+        WHERE receiver_id = #{receiverId} AND is_read = 0
+    </select>
+
+    <update id="markAsRead">
+        UPDATE messages SET is_read = 1
+        WHERE sender_id = #{senderId} AND receiver_id = #{receiverId} AND is_read = 0
+    </update>
+
+</mapper>

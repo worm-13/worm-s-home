@@ -2,12 +2,15 @@ package com.worm.community_backend;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
+@EnableScheduling
 public class CommunityBackendApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(CommunityBackendApplication.class, args);
+        System.out.println("你好，社区");
     }
 
 }
